@@ -1,0 +1,183 @@
+---
+title: "Ev02"
+author: "Armando Gutiérrez Rojo A01702748"
+date: "1/5/2021"
+output: html_document
+---
+
+```{r}
+library(Biostrings)
+library(seqinr)
+library(ape)
+library(ggtree)
+library(DECIPHER)
+library(viridis)
+library(ggplot2)
+library(ggmsa)
+library(ade4)
+```
+##20 países con más casos
+Se eligió comparar las variantes más recientes de los países que tienen mayor número de contagios. Las variantes que se analizaran son:
+Wuhan Hu 1: Se analizará también el virus de SARS COV2 de Wuhan, ya que fue la primera en surgir, y así poder comparar las otras variantes con el virus original. 
+1.USA : MW987808
+2.India : MW828655
+3.Brasil : MW592707
+4.Francia : MW332241
+5.Turquía : MW580244
+6.Rusia : MW308549
+7.Reino Unido : OB994371
+8.Italia : MW786740
+9.España : MW715073
+10.Alemania : MW822593
+11.Argentina : MW633906
+12.Colombia : MT470219
+13.Polonia : MW127515
+14.Iran : MT994849
+15.México : MW884223
+16.Ucrania : No hay datos en la base de NCBI.
+17.Perú : MW938104
+18.Indonesia : No hay datos en la base de NCBI.
+19.República Checa : MT517426
+20.Sudáfrica : MW981442
+
+Indonesia y Ucrania se omitirán por la falta de información en NCBI. Para cuestiones prácticas los nombres de cada variante serán los de su país de origen.
+
+##Secuencias de variantes
+```{r}
+virus <- c("NC_045512","MW987808","MW828655","MW592707","MW580244","MW332241","MW308549","OB994371","MW786740","MW715073","MW822593","MW633906","MT470219","MW127515","MT994849","MW884223","MW938104","MT517426","MW981442")
+nombres <- c("Wuhan Hu 1","USA","India","Brasil","Francia","Turquía","Rusia","ReinoUnido","Italia","España","Alemania","Argentina","Colombia","Polonia","Irán","México","Perú","R.Checa","Sudáfrica")
+seqfasta <- c()
+for(i in 1:length(virus)){
+   n <- 20 #Ingresar aquí cantidad de nucleotidos que se quieren imprimir
+   nombre = nombres[i]
+   secuencia <- read.GenBank(virus[i])
+   write.dna(secuencia,  file ="secuencia.fasta", format = "fasta", colsep="")
+   secuencia<-read.fasta(file = "secuencia.fasta",, as.string = TRUE, seqtype = "AA")[[1]]
+   secuencia <- toupper(secuencia)
+   seqfasta[i]=secuencia
+   names(seqfasta[i])=nombre
+   secuencias <- strsplit(secuencia, "")[[1]]
+   secuenciashort <- paste(secuencias[1:n], collapse="")
+   print(paste("La secuencia de la variante de", nombre, "es:",secuenciashort)) #Si se quiere ver la secuencia completa, sustituir secuenciashort por secuencia
+}
+   
+```
+##Calcular longitud de secuencias
+```{r}
+for(i in 1:length(virus)){
+   nombre = nombres[i]
+   print(paste("El tamaño de la secuencia de la variante de", nombre, "es de",nchar(seqfasta[i]), "nucleotidos"))
+  
+}
+
+```
+#Comparación de bases
+```{r}
+longitud <- c()
+for(i in 1:length(virus)){
+  longitud[i] = nchar(seqfasta[i])
+  
+}
+color <- c("blue", "green", "orange", "purple", "pink","yellow", "darkgreen", "darkblue", "gray", "cyan", "white", "aquamarine","azure1", "bisque","aliceblue", "antiquewhite4", "brown","darkgoldenrod")
+opar = par(oma = c(2,0,0,0))
+barplot(longitud,ylim = c(29700,29953),xlim=c(0,25), ylab="# de nucleotidos", main="Número de bases de variantes SARS COV-2", col = color, xpd=FALSE)
+par(opar) 
+opar =par(oma = c(0,0,0,0), mar = c(0,0,0,0), new = TRUE)
+legend(x = "bottom", legend = nombres, fill = color, bty = "n", ncol = 4, inset = -0.4,y.intersp = 2)
+par(opar) 
+
+```
+
+##Análisis jerárquico global
+```{r}
+
+virus_sequences <- read.GenBank(virus)
+# nombres_virus <- c("Human_betacoronavirus_2c_EMC/2012","SARS_Coronavirus_NS-1","SARS_CoV_2_Wuuhan-Hu-1","SARS_coronavirus_GZ02","SARS_CoV_2_WA-CDC-WA1")
+
+# Cambiar nombres
+for(i in 1:length(virus_sequences)){
+  names(virus_sequences)[i] = nombres[i]
+}
+
+#Concentrar en un archivo todas las secuencias
+write.dna(virus_sequences,  file ="virus_seqs.fasta", format = "fasta", append =FALSE, nbcol = 6, colsep = "", colw = 10)
+#Cargamos la secuencia
+virus_seq_not_align <- readDNAStringSet("virus_seqs.fasta", format = "fasta")
+#Alineamiento de la secuencia
+virus_seq_not_align <- OrientNucleotides(virus_seq_not_align)
+virus_seq_align <- AlignSeqs(virus_seq_not_align)
+#Guardar el resultado
+writeXStringSet(virus_seq_align, file="virus_seq_align.fasta")
+#Obtener nuevo archivo
+virus_aligned <- read.alignment("virus_seq_align.fasta", format = "fasta")
+#Crear matriz de distancia
+matriz_distancia <- dist.alignment(virus_aligned, matrix = "similarity")
+temp <- as.data.frame(as.matrix(matriz_distancia))
+table.paint(temp, cleg=0, clabel.row=1, clabel.col=1)
+#Creación del árbol
+virus_tree <- nj(matriz_distancia)
+virus_tree <- ladderize(virus_tree)
+#Combina el árbol filogenético con el alineamiento de las secuencias
+plot_virus <- ggtree(virus_tree, color="blue",size=1) + geom_tiplab() + geom_nodepoint() + geom_tippoint() + ggtitle("Árbol filogenético de variantes de SARS COV 2 de los países con más contagios")
+plot_virus 
+
+```
+##Análisis
+
+Se investigaron las variantes más recientes de SARS COV 2 de los primeros 20 países con más casos. Sin embargo, no había información disponible sobre Ucrania ni sobre Indonesia, por lo que se omitieron estos datos y se analizaron las 18 secuencias restantes. El objetivo de este análisis es averiguar si el número de casos de estos países está relacionado con su variante más reciente. También se incluyó la variante de Wuhan para realizar comparaciones. En primer lugar, se realizó una gráfica que compara las cantidades de nucleótidos de las variantes. En esta gráfica podemos observar que el tamaño de las secuencias varía, en el caso más extremo, en aproximadamente 200 nucleótidos. También podemos notar que el tamaño de las variantes de Wuhan, el de India, el de Reino Unido y el de Colombia, son iguales. El resto de las variantes, aunque tienen tamaños diferentes, estos no varían demasiado. Esto puede significar que las variantes son similares, pero para confirmar esto se generó una matriz de distancias y un árbol filogénetico. En ambos gráficos, se puede notar que la variante más reciente de India es la misma que surgió en Wuhan. Por otro lado, la variante que se parece menos al resto es la de Estados Unidos. Esto es interesante, ya que Estados Unidos e India ocupan el primer y segundo puesto respectivamente en países con más casos. Sin embargo, la de Estados Unidos es la que menos se parece a la de Wuhan, mientras que la de India es idéntica. Esto puede sugerir que las variantes son muy similares y que no hay una relación entre la variante y el número de casos. Si observamos el resto de las variantes, se puede notar que no han variado tanto con respecto a la variante de Wuhan, e incluso entre ellas no varían demasiado. Por esto, se puede concluir que las variantes de cada país son muy similares y por lo tanto el SARS COV 2 no es diferente en las poblaciones Hispana, Europea o Africana. En resumen, las variantes más recientes de cada país no implican un mayor o menor número de casos. Al ser muy similares las variantes, se puede intuir que la razón por la que estos países tienen más casos es por la deficiencia de medidas preventivas contra el coronavirus o el poco seguimiento de estas medidas por parte de las poblaciones. 
+
+##Referencias 
+##Librerias
+```{r}
+citation("Biostrings")
+citation("seqinr")
+citation("ape")
+citation("ggtree")
+citation("DECIPHER")
+citation("viridis")
+citation("ggplot2")
+citation("ggmsa")
+```
+##Otras fuentes
+
+
+
+COVID-19 Map - Johns Hopkins Coronavirus Resource Center. (2021) Retrieved April 29, 2021, from https://coronavirus.jhu.edu/map.html
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW987808.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/HOM - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW828655.1?report=fasta
+
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW592707.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW580244.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW332241.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW308549.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 genome assembly, compl - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/OB994371.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW786740.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW715073.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW822593.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW633906.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MT470219.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW127515.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MT994849.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW884223.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW938104.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MT517426.1?report=fasta
+
+Severe acute respiratory syndrome coronavirus 2 isolate SARS-CoV-2/hum - Nucleotide - NCBI. (2021) Retrieved April 29, 2021, from https://www.ncbi.nlm.nih.gov/nuccore/MW981442.1?report=fasta
+
